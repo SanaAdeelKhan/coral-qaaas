@@ -14,7 +14,241 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agent_registrations: {
+        Row: {
+          agent_id: string
+          coral_response: Json | null
+          coral_server_url: string
+          created_at: string
+          id: string
+          registered_at: string | null
+          registration_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          coral_response?: Json | null
+          coral_server_url: string
+          created_at?: string
+          id?: string
+          registered_at?: string | null
+          registration_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          coral_response?: Json | null
+          coral_server_url?: string
+          created_at?: string
+          id?: string
+          registered_at?: string | null
+          registration_status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_registrations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents: {
+        Row: {
+          capabilities: Json | null
+          coral_agent_id: string | null
+          created_at: string
+          endpoint_url: string
+          id: string
+          metadata: Json | null
+          name: string
+          status: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          capabilities?: Json | null
+          coral_agent_id?: string | null
+          created_at?: string
+          endpoint_url: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          status?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          capabilities?: Json | null
+          coral_agent_id?: string | null
+          created_at?: string
+          endpoint_url?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          status?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      repositories: {
+        Row: {
+          branch: string | null
+          clone_url: string | null
+          created_at: string
+          github_url: string
+          id: string
+          metadata: Json | null
+          name: string
+          owner_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          branch?: string | null
+          clone_url?: string | null
+          created_at?: string
+          github_url: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          branch?: string | null
+          clone_url?: string | null
+          created_at?: string
+          github_url?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      test_results: {
+        Row: {
+          agent_id: string
+          agent_type: string
+          completed_at: string | null
+          created_at: string
+          execution_time_ms: number | null
+          id: string
+          logs: string | null
+          result_data: Json | null
+          started_at: string | null
+          status: string | null
+          test_run_id: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          agent_type: string
+          completed_at?: string | null
+          created_at?: string
+          execution_time_ms?: number | null
+          id?: string
+          logs?: string | null
+          result_data?: Json | null
+          started_at?: string | null
+          status?: string | null
+          test_run_id: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          agent_type?: string
+          completed_at?: string | null
+          created_at?: string
+          execution_time_ms?: number | null
+          id?: string
+          logs?: string | null
+          result_data?: Json | null
+          started_at?: string | null
+          status?: string | null
+          test_run_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_results_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "test_results_test_run_id_fkey"
+            columns: ["test_run_id"]
+            isOneToOne: false
+            referencedRelation: "test_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      test_runs: {
+        Row: {
+          arweave_hash: string | null
+          completed_agents: number | null
+          completed_at: string | null
+          coral_transaction_id: string | null
+          created_at: string
+          id: string
+          ipfs_hash: string | null
+          metadata: Json | null
+          repository_id: string
+          solana_transaction_id: string | null
+          started_at: string | null
+          status: string | null
+          total_agents: number | null
+          updated_at: string
+        }
+        Insert: {
+          arweave_hash?: string | null
+          completed_agents?: number | null
+          completed_at?: string | null
+          coral_transaction_id?: string | null
+          created_at?: string
+          id?: string
+          ipfs_hash?: string | null
+          metadata?: Json | null
+          repository_id: string
+          solana_transaction_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          total_agents?: number | null
+          updated_at?: string
+        }
+        Update: {
+          arweave_hash?: string | null
+          completed_agents?: number | null
+          completed_at?: string | null
+          coral_transaction_id?: string | null
+          created_at?: string
+          id?: string
+          ipfs_hash?: string | null
+          metadata?: Json | null
+          repository_id?: string
+          solana_transaction_id?: string | null
+          started_at?: string | null
+          status?: string | null
+          total_agents?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_runs_repository_id_fkey"
+            columns: ["repository_id"]
+            isOneToOne: false
+            referencedRelation: "repositories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
