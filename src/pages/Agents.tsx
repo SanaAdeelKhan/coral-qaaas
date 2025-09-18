@@ -31,11 +31,23 @@ export default function Agents() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [newAgent, setNewAgent] = useState({
     name: "",
-    type: "mistral",
+    type: "repoClonerAgent",
     endpoint_url: "",
     capabilities: "",
     metadata: "",
   })
+
+  const qaasAgents = [
+    { id: "repoClonerAgent", name: "Repo Cloner Agent", description: "Clones target repositories for analysis", order: 1 },
+    { id: "fuzzAgent", name: "Fuzz Agent", description: "Performs fuzz testing to detect vulnerabilities", order: 2 },
+    { id: "unitTestAgent", name: "Unit Test Agent", description: "Runs automated unit tests on repository code", order: 3 },
+    { id: "integrationAgent", name: "Integration Agent", description: "Handles integration testing and cross-component checks", order: 4 },
+    { id: "mistralBugReasoningAgent", name: "Mistral Bug Reasoning Agent", description: "Analyzes test/fuzz results and reasons about bugs", order: 5 },
+    { id: "securityAgent", name: "Security Agent", description: "Performs security scanning and vulnerability checks", order: 6 },
+    { id: "aggregatorAgent", name: "Aggregator Agent", description: "Collects and summarizes results from all agents", order: 7 },
+    { id: "blockchainLogger", name: "Blockchain Logger", description: "Logs operations and results securely on blockchain", order: 8 },
+    { id: "voiceQAagent", name: "Voice QA Agent", description: "Provides voice-based interface for querying results", order: 9 },
+  ]
   const { toast } = useToast()
 
   useEffect(() => {
@@ -86,7 +98,7 @@ export default function Agents() {
 
       setNewAgent({
         name: "",
-        type: "mistral",
+        type: "repoClonerAgent",
         endpoint_url: "",
         capabilities: "",
         metadata: "",
@@ -98,6 +110,43 @@ export default function Agents() {
       toast({
         title: "Error",
         description: "Failed to add agent",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCreateQAaaS = async () => {
+    try {
+      const agentsToCreate = qaasAgents.map(agentTemplate => ({
+        name: agentTemplate.name,
+        type: agentTemplate.id,
+        endpoint_url: `http://localhost:${5555 + agentTemplate.order}`,
+        capabilities: { workflow_order: agentTemplate.order, description: agentTemplate.description },
+        metadata: { 
+          coral_registration: true,
+          manifest_required: true,
+          runtime: "nodejs",
+          environment_variables: ["MISTRAL_API_KEY", "TIMEOUT_MS"] 
+        },
+      }))
+
+      const { data, error } = await supabase
+        .from("agents")
+        .insert(agentsToCreate)
+
+      if (error) throw error
+
+      toast({
+        title: "Success",
+        description: `Created ${qaasAgents.length} QAaaS workflow agents`,
+      })
+      
+      fetchAgents()
+    } catch (error) {
+      console.error("Error creating QAaaS workflow:", error)
+      toast({
+        title: "Error", 
+        description: "Failed to create QAaaS workflow",
         variant: "destructive",
       })
     }
@@ -144,6 +193,14 @@ export default function Agents() {
     }
   }
 
+  const getAgentInfo = (type: string) => {
+    return qaasAgents.find(agent => agent.id === type) || { 
+      name: type.charAt(0).toUpperCase() + type.slice(1), 
+      description: "Agent", 
+      order: 0 
+    }
+  }
+
   const getTypeIcon = (type: string) => {
     return <Bot className="w-4 h-4" />
   }
@@ -165,14 +222,19 @@ export default function Agents() {
             Manage your testing agents and their configurations
           </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Agent
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleCreateQAaaS}>
+            <Bot className="w-4 h-4 mr-2" />
+            Create QAaaS Workflow
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Agent
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Add New Agent</DialogTitle>
               <DialogDescription>
@@ -204,10 +266,19 @@ export default function Agents() {
                     <SelectValue placeholder="Select agent type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="mistral">Mistral AI</SelectItem>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                    <SelectItem value="anthropic">Anthropic</SelectItem>
-                    <SelectItem value="custom">Custom</SelectItem>
+                    {qaasAgents.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                            {agent.order}
+                          </span>
+                          <div>
+                            <div>{agent.name}</div>
+                            <div className="text-xs text-muted-foreground">{agent.description}</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -255,6 +326,7 @@ export default function Agents() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -271,11 +343,18 @@ export default function Agents() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredAgents.length > 0 ? (
-          filteredAgents.map((agent) => (
+          filteredAgents.map((agent) => {
+            const agentInfo = getAgentInfo(agent.type)
+            return (
             <Card key={agent.id} className="border-border hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    {agentInfo.order > 0 && (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded font-medium">
+                        #{agentInfo.order}
+                      </span>
+                    )}
                     {getTypeIcon(agent.type)}
                     <CardTitle className="text-lg">{agent.name}</CardTitle>
                   </div>
@@ -284,7 +363,7 @@ export default function Agents() {
                   </Badge>
                 </div>
                 <CardDescription>
-                  {agent.type.charAt(0).toUpperCase() + agent.type.slice(1)} Agent
+                  {agentInfo.description}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -328,7 +407,8 @@ export default function Agents() {
                 </div>
               </CardContent>
             </Card>
-          ))
+            )
+          })
         ) : (
           <div className="col-span-full">
             <Card className="border-border">
