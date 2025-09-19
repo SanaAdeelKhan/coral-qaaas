@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Play, Plus, Search, Clock, CheckCircle, XCircle, AlertCircle, Eye } from "lucide-react"
+import { Play, Plus, Search, Clock, CheckCircle, XCircle, AlertCircle, Eye, RefreshCw } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
+import { AgentRegistration } from "@/components/AgentRegistration"
 
 interface TestRun {
   id: string
@@ -96,25 +97,64 @@ export default function TestRuns() {
   }
 
   const handleCreateTestRun = async () => {
+    if (!newTestRun.repository_id) {
+      toast({
+        title: "Error",
+        description: "Please select a repository",
+        variant: "destructive", 
+      })
+      return
+    }
+
     try {
+      // Create the test run with total_agents set to 9 for QAaaS workflow
       const { data, error } = await supabase
         .from("test_runs")
         .insert([
           {
             repository_id: newTestRun.repository_id,
             status: "queued",
-            metadata: newTestRun.metadata ? JSON.parse(newTestRun.metadata) : {},
-            total_agents: 0,
+            total_agents: 9, // Set to 9 for QAaaS workflow
             completed_agents: 0,
+            metadata: newTestRun.metadata ? JSON.parse(newTestRun.metadata) : {},
           },
         ])
+        .select()
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "Test run created successfully",
-      })
+      console.log('Test run created:', data);
+      
+      // Trigger the workflow orchestrator
+      if (data && data[0]) {
+        try {
+          const response = await supabase.functions.invoke('agent-workflow-trigger', {
+            body: { test_run_id: data[0].id }
+          });
+          
+          if (response.error) {
+            console.error('Error triggering workflow:', response.error);
+            toast({
+              title: "Warning",
+              description: "Test run created but workflow trigger failed",
+              variant: "destructive",
+            });
+          } else {
+            console.log('Workflow triggered successfully:', response.data);
+            toast({
+              title: "Success",
+              description: "Test run created and workflow started",
+            });
+          }
+        } catch (triggerError) {
+          console.error('Error triggering workflow:', triggerError);
+          toast({
+            title: "Warning", 
+            description: "Test run created but workflow trigger failed",
+            variant: "destructive",
+          });
+        }
+      }
 
       setNewTestRun({
         repository_id: "",

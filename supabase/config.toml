@@ -1,1 +1,64 @@
 project_id = "hwayxkeeegskxhdogmwj"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["auth", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+host = "localhost"
+port = 5432
+user = "postgres"
+password = "your-super-secret-and-long-postgres-password"
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 6543
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+ip_version = 4
+port = 4000
+secure_channels = false
+schema = "public"
+extensions = ["broadcast", "presence", "postgres_changes"]
+
+[storage]
+enabled = true
+port = 5442
+file_size_limit = "50MiB"
+s3_host = "localhost"
+s3_port = 9000
+s3_access_key_id = ""
+s3_secret_access_key = ""
+s3_bucket = "supabase"
+s3_region = "us-east-1"
+
+[auth]
+enabled = true
+port = 9999
+external_url = "http://localhost:3000"
+enable_manual_linking = false
+
+[edge_runtime]
+enabled = enabled
+port = 54322
+inspector_port = 5555
+
+[functions.coral-agent-registration]
+verify_jwt = false
+
+[functions.test-run-orchestrator]
+verify_jwt = false
+
+[functions.agent-workflow-trigger]
+verify_jwt = false
+
+[functions.voice-qa-agent]
+verify_jwt = false
