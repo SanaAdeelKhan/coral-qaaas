@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, CheckCircle, AlertCircle, RefreshCw, Bot } from 'lucide-react';
 
 interface AgentRegistrationProps {
   onRegistrationComplete?: () => void;
@@ -85,14 +85,15 @@ export const AgentRegistration: React.FC<AgentRegistrationProps> = ({ onRegistra
   };
 
   return (
-    <Card className="w-full">
+    <Card className="w-full border-orange-200 bg-orange-50">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <RefreshCw className="w-5 h-5" />
-          Agent Registration
+        <CardTitle className="flex items-center gap-2 text-orange-800">
+          <Bot className="w-5 h-5" />
+          Agent Registration Required
         </CardTitle>
-        <CardDescription>
-          Register QAaaS agents with the Coral server running on localhost:5555
+        <CardDescription className="text-orange-700">
+          <strong>Important:</strong> Register your QAaaS agents with the Coral server before running tests. 
+          Without registration, test runs will skip all agent workflows.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

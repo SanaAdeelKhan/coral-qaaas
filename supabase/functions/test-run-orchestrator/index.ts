@@ -42,20 +42,38 @@ serve(async (req) => {
 
     console.log(`Found ${queuedRuns?.length || 0} queued test runs to process`);
 
-    // Get all active agents for the workflow
-    const { data: agents, error: agentsError } = await supabase
+    // Get all active agents for the workflow - prioritize registered agents, fall back to unregistered
+    const { data: registeredAgents, error: registeredError } = await supabase
       .from('agents')
       .select('*')
       .eq('status', 'active')
       .not('coral_agent_id', 'is', null)
       .order('created_at', { ascending: true });
 
-    if (agentsError) {
-      console.error('Error fetching agents:', agentsError);
-      throw agentsError;
+    if (registeredError) {
+      console.error('Error fetching registered agents:', registeredError);
     }
 
-    console.log(`Found ${agents?.length || 0} active registered agents`);
+    let agents = registeredAgents || [];
+    console.log(`Found ${agents.length} registered agents`);
+
+    // If no registered agents, use unregistered ones as fallback
+    if (agents.length === 0) {
+      console.log('No registered agents found, using unregistered agents as fallback');
+      const { data: unregisteredAgents, error: unregisteredError } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: true });
+
+      if (unregisteredError) {
+        console.error('Error fetching unregistered agents:', unregisteredError);
+        throw unregisteredError;
+      }
+
+      agents = unregisteredAgents || [];
+      console.log(`Found ${agents.length} total active agents (unregistered)`);
+    }
 
     const results = [];
 
@@ -70,7 +88,7 @@ serve(async (req) => {
           .update({
             status: 'running',
             started_at: new Date().toISOString(),
-            total_agents: agents?.length || 0,
+            total_agents: 9, // QAaaS workflow has 9 defined agent steps
             completed_agents: 0,
             updated_at: new Date().toISOString()
           })
@@ -88,7 +106,7 @@ serve(async (req) => {
           test_run_id: testRun.id,
           repository: testRun.repositories?.name,
           status: 'started',
-          total_agents: agents?.length || 0
+          total_agents: 9 // QAaaS workflow has 9 defined agent steps
         });
 
       } catch (error) {
@@ -162,9 +180,12 @@ async function startAgentWorkflow(supabase: any, testRun: any, agents: any[]) {
     const agent = agents.find(a => a.type === agentType);
     
     if (!agent) {
-      console.log(`Skipping ${agentType} - agent not found or not registered`);
+      console.log(`Skipping ${agentType} - agent not found`);
       continue;
     }
+
+    const isRegistered = agent.coral_agent_id ? 'registered' : 'unregistered';
+    console.log(`Starting ${agentType} (${isRegistered}) for test run ${testRun.id}`);
 
     try {
       console.log(`Executing agent ${i + 1}/${workflowSequence.length}: ${agent.name} (${agent.type})`);
