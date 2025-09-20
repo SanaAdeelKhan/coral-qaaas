@@ -5,9 +5,23 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart3, Search, CheckCircle, XCircle, Clock, Download, Filter } from "lucide-react"
+import { BarChart3, Search, CheckCircle, XCircle, Clock, Download, Filter, TrendingUp, Activity } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell, 
+  LineChart, 
+  Line 
+} from 'recharts'
 
 interface TestResult {
   id: string
@@ -82,6 +96,8 @@ export default function TestResults() {
         return <XCircle className="w-4 h-4 text-red-600" />
       case "pending":
         return <Clock className="w-4 h-4 text-yellow-600" />
+      case "running":
+        return <Activity className="w-4 h-4 text-blue-600 animate-pulse" />
       default:
         return <Clock className="w-4 h-4 text-gray-600" />
     }
@@ -95,6 +111,8 @@ export default function TestResults() {
         return "destructive"
       case "pending":
         return "secondary"
+      case "running":
+        return "default"
       default:
         return "outline"
     }
@@ -110,10 +128,55 @@ export default function TestResults() {
     const total = results.length
     const completed = results.filter(r => r.status === "completed").length
     const failed = results.filter(r => r.status === "failed").length
-    const pending = results.filter(r => r.status === "pending").length
+    const pending = results.filter(r => r.status === "pending" || r.status === "running").length
     const successRate = total > 0 ? Math.round((completed / (completed + failed)) * 100) : 0
 
     return { total, completed, failed, pending, successRate }
+  }
+
+  const getChartData = () => {
+    // Agent performance data
+    const agentTypes = [...new Set(results.map(r => r.agent_type))]
+    const agentPerformance = agentTypes.map(type => {
+      const agentResults = results.filter(r => r.agent_type === type)
+      const completed = agentResults.filter(r => r.status === "completed").length
+      const failed = agentResults.filter(r => r.status === "failed").length
+      const avgTime = agentResults.reduce((acc, r) => acc + (r.execution_time_ms || 0), 0) / agentResults.length
+      
+      return {
+        name: type.replace('Agent', '').replace(/([A-Z])/g, ' $1').trim(),
+        completed,
+        failed,
+        total: agentResults.length,
+        avgTime: Math.round(avgTime)
+      }
+    })
+
+    // Status distribution
+    const statusData = [
+      { name: 'Completed', value: results.filter(r => r.status === "completed").length, color: '#10b981' },
+      { name: 'Failed', value: results.filter(r => r.status === "failed").length, color: '#ef4444' },
+      { name: 'Pending', value: results.filter(r => r.status === "pending" || r.status === "running").length, color: '#f59e0b' },
+    ].filter(item => item.value > 0)
+
+    // Timeline data (last 7 days)
+    const timelineData = Array.from({length: 7}, (_, i) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (6 - i))
+      const dayResults = results.filter(r => {
+        const resultDate = new Date(r.created_at)
+        return resultDate.toDateString() === date.toDateString()
+      })
+      
+      return {
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        completed: dayResults.filter(r => r.status === "completed").length,
+        failed: dayResults.filter(r => r.status === "failed").length,
+        total: dayResults.length
+      }
+    })
+
+    return { agentPerformance, statusData, timelineData }
   }
 
   const filteredResults = results.filter(result => {
@@ -129,6 +192,7 @@ export default function TestResults() {
   })
 
   const stats = getStats()
+  const chartData = getChartData()
 
   if (loading) {
     return (
@@ -203,6 +267,123 @@ export default function TestResults() {
         </Card>
       </div>
 
+      {/* Analytics Charts */}
+      {results.length > 0 && (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* Status Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                Status Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData.statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {chartData.statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name) => [value, name]}
+                      labelStyle={{ color: '#333' }}
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Agent Performance */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Agent Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData.agentPerformance}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{ fontSize: 10 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => [value, name]}
+                      labelStyle={{ color: '#333' }}
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                    />
+                    <Bar dataKey="completed" fill="#10b981" name="Completed" />
+                    <Bar dataKey="failed" fill="#ef4444" name="Failed" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                7-Day Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData.timelineData}>
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => [value, name]}
+                      labelStyle={{ color: '#333' }}
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="completed" 
+                      stroke="#10b981" 
+                      name="Completed"
+                      strokeWidth={2}
+                      dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="failed" 
+                      stroke="#ef4444" 
+                      name="Failed"
+                      strokeWidth={2}
+                      dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 max-w-sm">
@@ -223,18 +404,24 @@ export default function TestResults() {
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="failed">Failed</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="running">Running</SelectItem>
           </SelectContent>
         </Select>
         <Select value={agentTypeFilter} onValueChange={setAgentTypeFilter}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="w-40">
             <SelectValue placeholder="Agent Type" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="mistral">Mistral</SelectItem>
-            <SelectItem value="openai">OpenAI</SelectItem>
-            <SelectItem value="anthropic">Anthropic</SelectItem>
-            <SelectItem value="custom">Custom</SelectItem>
+            <SelectItem value="repoClonerAgent">Repo Cloner</SelectItem>
+            <SelectItem value="fuzzAgent">Fuzz Testing</SelectItem>
+            <SelectItem value="unitTestAgent">Unit Tests</SelectItem>
+            <SelectItem value="integrationAgent">Integration</SelectItem>
+            <SelectItem value="mistralBugReasoningAgent">Bug Analysis</SelectItem>
+            <SelectItem value="securityAgent">Security</SelectItem>
+            <SelectItem value="aggregatorAgent">Aggregator</SelectItem>
+            <SelectItem value="blockchainLogger">Blockchain</SelectItem>
+            <SelectItem value="voiceQAagent">Voice QA</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -303,10 +490,16 @@ export default function TestResults() {
                   <div className="mt-4 pt-4 border-t border-border">
                     <p className="text-sm text-muted-foreground mb-2">Result Summary</p>
                     <div className="text-xs bg-muted p-2 rounded-md">
-                      <pre className="whitespace-pre-wrap text-muted-foreground">
-                        {JSON.stringify(result.result_data, null, 2).substring(0, 200)}
-                        {JSON.stringify(result.result_data, null, 2).length > 200 ? "..." : ""}
-                      </pre>
+                      {result.result_data.error ? (
+                        <div className="text-red-600 font-medium">
+                          Error: {result.result_data.error}
+                        </div>
+                      ) : (
+                        <pre className="whitespace-pre-wrap text-muted-foreground">
+                          {JSON.stringify(result.result_data, null, 2).substring(0, 200)}
+                          {JSON.stringify(result.result_data, null, 2).length > 200 ? "..." : ""}
+                        </pre>
+                      )}
                     </div>
                   </div>
                 )}

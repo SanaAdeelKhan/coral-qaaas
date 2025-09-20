@@ -246,7 +246,8 @@ async function startAgentWorkflow(supabase: any, testRun: any, agents: any[]) {
         .update({
           status: 'failed',
           completed_at: new Date().toISOString(),
-          logs: `Agent execution failed: ${error.message}`
+          logs: `Agent execution failed: ${error.message}`,
+          result_data: { error: error.message }
         })
         .eq('test_run_id', testRun.id)
         .eq('agent_id', agent.id);
