@@ -272,8 +272,8 @@ async function executeAgentStep(agent: any, workflowData: any) {
   try {
     console.log(`Executing ${agent.type} with workflow data`);
 
-    // Simulate agent execution based on type
-    const result = await simulateAgentExecution(agent, workflowData);
+    // Execute real agent workflow
+    const result = await executeAgentWorkflow(agent, workflowData);
     
     const executionTime = Date.now() - startTime;
     
