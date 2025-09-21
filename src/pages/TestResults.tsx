@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart3, Search, CheckCircle, XCircle, Clock, Download, Filter, TrendingUp, Activity } from "lucide-react"
+import { BarChart3, Search, CheckCircle, XCircle, Clock, Download, Activity, TrendingUp } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 import { useToast } from "@/hooks/use-toast"
+import ApiErrorNotification from "@/components/ApiErrorNotification"
 import { 
   BarChart, 
   Bar, 
@@ -88,12 +89,55 @@ export default function TestResults() {
     }
   }
 
-  const getStatusIcon = (status: string) => {
+  const clearResults = async () => {
+    if (window.confirm("Are you sure you want to clear all test results? This action cannot be undone.")) {
+      try {
+        setLoading(true)
+        const { error } = await supabase
+          .from("test_results")
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all records
+        
+        if (error) throw error
+        
+        await fetchResults()
+        toast({
+          title: "Success",
+          description: "All test results have been cleared",
+        })
+      } catch (error) {
+        console.error("Error clearing results:", error)
+        toast({
+          title: "Error", 
+          description: "Failed to clear test results",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  const getStatusIcon = (status: string, resultData?: any) => {
+    // Enhance status display based on actual result content
+    const isApiError = resultData?.error && (
+      resultData.error.includes('Unauthorized') ||
+      resultData.error.includes('API key') ||
+      resultData.error.includes('401')
+    )
+    
     switch (status) {
       case "completed":
+      case "success":
         return <CheckCircle className="w-4 h-4 text-green-600" />
       case "failed":
-        return <XCircle className="w-4 h-4 text-red-600" />
+        return isApiError ? 
+          <div title="API Configuration Error">
+            <XCircle className="w-4 h-4 text-orange-500" />
+          </div> :
+          <div title="Test Failed">
+            <XCircle className="w-4 h-4 text-red-600" />
+          </div>
       case "pending":
         return <Clock className="w-4 h-4 text-yellow-600" />
       case "running":
@@ -103,12 +147,19 @@ export default function TestResults() {
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, resultData?: any) => {
+    const isApiError = resultData?.error && (
+      resultData.error.includes('Unauthorized') ||
+      resultData.error.includes('API key') ||
+      resultData.error.includes('401')
+    )
+    
     switch (status) {
       case "completed":
+      case "success":
         return "default"
       case "failed":
-        return "destructive"
+        return isApiError ? "secondary" : "destructive"
       case "pending":
         return "secondary"
       case "running":
@@ -126,12 +177,18 @@ export default function TestResults() {
 
   const getStats = () => {
     const total = results.length
-    const completed = results.filter(r => r.status === "completed").length
+    const completed = results.filter(r => r.status === "completed" || r.status === "success").length
     const failed = results.filter(r => r.status === "failed").length
+    const apiErrors = results.filter(r => r.status === "failed" && r.result_data?.error && (
+      r.result_data.error.includes('Unauthorized') ||
+      r.result_data.error.includes('API key') ||
+      r.result_data.error.includes('401')
+    )).length
+    const actualFails = failed - apiErrors
     const pending = results.filter(r => r.status === "pending" || r.status === "running").length
-    const successRate = total > 0 ? Math.round((completed / (completed + failed)) * 100) : 0
+    const successRate = total > 0 ? Math.round((completed / (completed + actualFails)) * 100) : 0
 
-    return { total, completed, failed, pending, successRate }
+    return { total, completed, failed: actualFails, apiErrors, pending, successRate }
   }
 
   const getChartData = () => {
@@ -211,11 +268,25 @@ export default function TestResults() {
             View and analyze test execution results
           </p>
         </div>
-        <Button variant="outline">
-          <Download className="w-4 h-4 mr-2" />
-          Export Results
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={clearResults} disabled={results.length === 0}>
+            <XCircle className="w-4 h-4 mr-2" />
+            Clear Results
+          </Button>
+          <Button variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export Results
+          </Button>
+        </div>
       </div>
+
+      {/* API Error Notification */}
+      {stats.apiErrors > 0 && (
+        <ApiErrorNotification 
+          apiErrors={stats.apiErrors} 
+          onConfigureApis={() => window.open('https://supabase.com/dashboard/project/hwayxkeeegskxhdogmwj/settings/functions', '_blank')}
+        />
+      )}
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -241,17 +312,20 @@ export default function TestResults() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Failed</p>
-                <p className="text-2xl font-bold text-red-600">{stats.failed}</p>
-              </div>
-              <XCircle className="w-8 h-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
+         <Card>
+           <CardContent className="p-4">
+             <div className="flex items-center justify-between">
+               <div>
+                 <p className="text-sm text-muted-foreground">Failed</p>
+                 <p className="text-2xl font-bold text-red-600">{stats.failed}</p>
+                 {stats.apiErrors > 0 && (
+                   <p className="text-xs text-orange-500">{stats.apiErrors} API errors</p>
+                 )}
+               </div>
+               <XCircle className="w-8 h-8 text-red-600" />
+             </div>
+           </CardContent>
+         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">

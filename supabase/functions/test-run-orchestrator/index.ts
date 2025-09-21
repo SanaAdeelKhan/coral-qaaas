@@ -212,19 +212,41 @@ async function startAgentWorkflow(supabase: any, testRun: any, agents: any[]) {
       const agentResult = await executeAgentStep(agent, workflowData);
 
       // Update test result with completion
+      // Update test result with completion status - distinguish between API errors and actual failures
+      let updateStatus = 'completed';
+      let resultData = agentResult.data;
+      
+      if (!agentResult.success) {
+        const errorMsg = agentResult.error || 'Unknown error';
+        const isApiError = errorMsg.includes('Unauthorized') || 
+                          errorMsg.includes('401') || 
+                          errorMsg.includes('API key') ||
+                          errorMsg.includes('ELEVENLABS_API_KEY') ||
+                          errorMsg.includes('MISTRAL_API_KEY');
+        
+        updateStatus = 'failed';
+        resultData = { 
+          ...agentResult.data,
+          error: errorMsg,
+          error_type: isApiError ? 'api_configuration' : 'execution_failure'
+        };
+        
+        console.log(`Agent ${agent.name} ${isApiError ? 'API configuration error' : 'execution failure'}: ${errorMsg}`);
+      }
+
       await supabase
         .from('test_results')
         .update({
-          status: agentResult.success ? 'completed' : 'failed',
+          status: updateStatus,
           completed_at: new Date().toISOString(),
           execution_time_ms: agentResult.execution_time_ms,
           logs: agentResult.logs,
-          result_data: agentResult.data
+          result_data: resultData
         })
         .eq('id', testResult.id);
 
-      // Update workflow data with results
-      workflowData.results[agentType] = agentResult.data;
+      // Update workflow data with results  
+      workflowData.results[agentType] = resultData;
 
       // Update test run progress
       await supabase
@@ -776,11 +798,18 @@ async function generateVoiceSummary(workflowData: any) {
     };
     
   } catch (error) {
+    console.error('Voice generation failed:', error);
+    const isApiError = error.message.includes('API key') || 
+                       error.message.includes('Unauthorized') ||
+                       error.message.includes('401');
+    
     return {
       status: 'failed',
       error: error.message,
+      error_type: isApiError ? 'api_configuration' : 'execution_failure',
       voice_summary_generated: false,
-      summary_text: generateSummaryText(workflowData.repository, workflowData.results?.aggregatorAgent || {})
+      summary_text: generateSummaryText(workflowData.repository, workflowData.results?.aggregatorAgent || {}),
+      fallback_summary: true
     };
   }
 }

@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.voice-qa-agent]
 verify_jwt = false
+
+[functions.clear-test-results]
+verify_jwt = false
